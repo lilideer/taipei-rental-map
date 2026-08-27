@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>台北租屋地圖</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+:root {
+  --bg:#f5f5f5;
+  --surface:#ffffff;
+  --border:#e0e0e0;
+  --text:#1a1a18;
+  --text-sec:#6b6a65;
+  --accent:#1a73e8;
+  --accent-light:#e8f0fe;
+  --danger:#d93025;
+  --danger-light:#fce8e6;
+  --green:#188038;
+  --green-light:#e6f4ea;
+  --radius:8px;
+  --heart:#e03131;
+}
+body { font-family:-apple-system,BlinkMacSystemFont,'Noto Sans TC','Google Sans',sans-serif; background:var(--bg); color:var(--text); height:100dvh; display:flex; flex-direction:column; overflow:hidden; }
+#map { flex:1; min-height:0; }
+
+/* PANEL */
+.panel { background:var(--surface); border-top:1px solid var(--border); padding:14px 18px 16px; display:flex; flex-direction:column; gap:10px; max-height:42vh; overflow-y:auto; }
+.panel-title { font-size:12px; font-weight:600; color:var(--text-sec); letter-spacing:.06em; text-transform:uppercase; }
+
+.form-row { display:flex; gap:10px; align-items:flex-start; }
+.form-col { display:flex; flex-direction:column; gap:5px; flex:1; min-width:0; }
+
+input[type="text"] { width:100%; height:34px; border:1px solid var(--border); border-radius:var(--radius); padding:0 11px; font-size:13px; color:var(--text); background:var(--surface); outline:none; transition:border-color .15s; }
+input[type="text"]:focus { border-color:var(--accent); box-shadow:0 0 0 2px rgba(26,115,232,.15); }
+input[type="text"]::placeholder { color:#bbb; }
+
+/* TAGS AREA */
+.tags-section { display:flex; flex-direction:column; gap:6px; }
+.tags-row { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+.tag-label { font-size:12px; color:var(--text-sec); white-space:nowrap; min-width:28px; }
+
+.tag-btn {
+  border:1px solid var(--border); border-radius:16px; padding:3px 10px;
+  font-size:12px; background:var(--surface); color:var(--text-sec);
+  cursor:pointer; transition:all .12s; user-select:none; display:flex; align-items:center; gap:4px;
+}
+.tag-btn:hover { border-color:var(--accent); color:var(--accent); }
+.tag-btn.active { background:var(--accent-light); border-color:var(--accent); color:var(--accent); font-weight:500; }
+.tag-btn .tag-x { font-size:10px; opacity:.6; line-height:1; }
+.tag-btn.active .tag-x { opacity:.8; }
+.tag-btn .tag-x:hover { opacity:1; color:var(--danger); }
+
+/* custom tag input */
+.custom-tag-row { display:flex; gap:6px; align-items:center; }
+.custom-tag-inp { height:28px; width:120px; font-size:12px; border:1px dashed var(--border); border-radius:16px; padding:0 10px; }
+.custom-tag-inp:focus { border-color:var(--accent); border-style:solid; }
+.add-tag-btn { height:28px; padding:0 10px; font-size:12px; border:1px solid var(--accent); border-radius:16px; background:var(--accent-light); color:var(--accent); cursor:pointer; white-space:nowrap; }
+.add-tag-btn:hover { background:var(--accent); color:#fff; }
+
+.heart-btn { border:1px solid var(--border); border-radius:16px; padding:3px 11px; font-size:13px; background:var(--surface); color:var(--text-sec); cursor:pointer; transition:all .12s; user-select:none; }
+.heart-btn:hover { border-color:var(--heart); color:var(--heart); }
+.heart-btn.active { background:#fff0f0; border-color:var(--heart); color:var(--heart); }
+
+/* BUTTONS ROW */
+.action-row { display:flex; gap:8px; align-items:center; }
+.add-btn { height:34px; padding:0 18px; background:var(--accent); color:#fff; border:none; border-radius:var(--radius); font-size:13px; font-weight:500; cursor:pointer; white-space:nowrap; transition:background .12s; flex-shrink:0; }
+.add-btn:hover { background:#1557b0; }
+.error-msg { font-size:12px; color:var(--danger); flex:1; }
+.geo-status { font-size:11px; color:var(--text-sec); min-height:14px; }
+
+/* DIVIDER */
+.divider { border:none; border-top:1px solid var(--border); margin:2px 0; }
+
+/* ENTRY LIST */
+.entries-list { display:flex; flex-direction:column; gap:5px; }
+.entry-row {
+  display:flex; align-items:center; gap:8px;
+  background:var(--bg); border:1px solid var(--border); border-radius:var(--radius);
+  padding:7px 11px; font-size:12px;
+}
+.entry-addr { font-weight:600; font-size:13px; flex-shrink:0; max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.entry-tags { display:flex; gap:4px; flex-wrap:wrap; flex:1; }
+.entry-tag { background:var(--accent-light); color:var(--accent); border-radius:10px; padding:1px 7px; font-size:11px; font-weight:500; }
+.entry-heart { color:var(--heart); font-size:12px; flex-shrink:0; }
+.entry-date { color:var(--text-sec); font-size:11px; flex-shrink:0; white-space:nowrap; }
+.entry-link { color:var(--accent); font-size:11px; text-decoration:none; flex-shrink:0; }
+.entry-link:hover { text-decoration:underline; }
+
+.edit-btn { background:none; border:1px solid var(--border); border-radius:6px; color:var(--text-sec); cursor:pointer; font-size:11px; padding:2px 7px; flex-shrink:0; transition:all .12s; }
+.edit-btn:hover { border-color:var(--accent); color:var(--accent); background:var(--accent-light); }
+.remove-btn { background:none; border:none; color:#ccc; cursor:pointer; font-size:14px; padding:2px 3px; border-radius:5px; flex-shrink:0; transition:all .12s; }
+.remove-btn:hover { color:var(--danger); background:var(--danger-light); }
+
+/* MODAL */
+.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:9999; align-items:center; justify-content:center; }
+.modal-overlay.open { display:flex; }
+.modal { background:var(--surface); border-radius:12px; padding:24px; width:min(520px,92vw); max-height:85vh; overflow-y:auto; display:flex; flex-direction:column; gap:14px; box-shadow:0 8px 32px rgba(0,0,0,.2); }
+.modal-title { font-size:15px; font-weight:600; }
+.modal-label { font-size:12px; color:var(--text-sec); margin-bottom:4px; }
+.modal-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:4px; }
+.modal-cancel { height:34px; padding:0 16px; background:none; border:1px solid var(--border); border-radius:var(--radius); font-size:13px; cursor:pointer; }
+.modal-save { height:34px; padding:0 16px; background:var(--accent); color:#fff; border:none; border-radius:var(--radius); font-size:13px; font-weight:500; cursor:pointer; }
+.modal-save:hover { background:#1557b0; }
+
+/* POPUP */
+.map-pin-popup { font-family:-apple-system,BlinkMacSystemFont,'Noto Sans TC',sans-serif; }
+.map-pin-popup a { color:var(--accent); font-weight:500; text-decoration:none; }
+.map-pin-popup a:hover { text-decoration:underline; }
+.popup-tags { display:flex; gap:4px; flex-wrap:wrap; margin-top:5px; }
+.popup-tag { background:var(--accent-light); color:var(--accent); border-radius:10px; padding:1px 7px; font-size:11px; }
+.popup-heart { color:var(--heart); font-size:12px; margin-top:3px; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div class="panel">
+  <div class="panel-title">新增物件</div>
+
+  <div class="form-row">
+    <div class="form-col">
+      <input type="text" id="inp-addr" placeholder="地址（例：台北市大安區復興南路一段100號）"/>
+      <span class="geo-status" id="geo-status"></span>
+    </div>
+    <div class="form-col">
+      <input type="text" id="inp-url" placeholder="591 物件網址"/>
+    </div>
+  </div>
+
+  <div class="tags-section">
+    <div class="tags-row" id="tags-row">
+      <span class="tag-label">標籤</span>
+    </div>
+    <div class="custom-tag-row">
+      <input type="text" class="custom-tag-inp" id="custom-tag-inp" placeholder="自訂標籤（限6字）" maxlength="6"/>
+      <button class="add-tag-btn" id="add-tag-btn">＋ 新增標籤</button>
+    </div>
+  </div>
+
+  <div class="tags-row">
+    <span class="tag-label">喜愛度</span>
+    <button class="heart-btn" data-heart="♥">♥</button>
+    <button class="heart-btn" data-heart="♥♥">♥♥</button>
+    <button class="heart-btn" data-heart="♥♥♥">♥♥♥</button>
+  </div>
+
+  <div class="action-row">
+    <span class="error-msg" id="err-msg"></span>
+    <button class="add-btn" id="add-btn">新增到地圖</button>
+  </div>
+
+  <hr class="divider" id="list-divider" style="display:none"/>
+  <div class="entries-list" id="entries-list"></div>
+</div>
+
+<!-- EDIT MODAL -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-title">修改物件</div>
+    <div>
+      <div class="modal-label">地址</div>
+      <input type="text" id="m-addr" placeholder="地址"/>
+    </div>
+    <div>
+      <div class="modal-label">591 網址</div>
+      <input type="text" id="m-url" placeholder="591 物件網址"/>
+    </div>
+    <div>
+      <div class="modal-label">標籤（點選切換；可新增自訂）</div>
+      <div class="tags-row" id="m-tags-row" style="margin-bottom:8px"></div>
+      <div class="custom-tag-row">
+        <input type="text" class="custom-tag-inp" id="m-custom-inp" placeholder="自訂標籤（限6字）" maxlength="6"/>
+        <button class="add-tag-btn" id="m-add-tag-btn">＋ 新增標籤</button>
+      </div>
+    </div>
+    <div>
+      <div class="modal-label">喜愛度</div>
+      <div class="tags-row" id="m-hearts-row">
+        <button class="heart-btn" data-heart="♥">♥</button>
+        <button class="heart-btn" data-heart="♥♥">♥♥</button>
+        <button class="heart-btn" data-heart="♥♥♥">♥♥♥</button>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-cancel" id="modal-cancel">取消</button>
+      <button class="modal-save" id="modal-save">儲存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'taipei-rental-entries-v2';
+/* ── Map (CartoDB Positron ≈ Google Maps light style) ── */
+const map = L.map('map').setView([25.046, 121.517], 13);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+  attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/">CARTO</a>',
+  subdomains: 'abcd', maxZoom: 19
+}).addTo(map);
+
+/* ── State ── */
+let entries = [];
+let markers = {};
+let selectedTags = new Set();
+let selectedHeart = '';
+let editingId = null;
+let modalTags = new Set();
+let modalHeart = '';
+
+/* Default tag pool (persisted too) */
+const DEFAULT_TAGS = ['#有浴缸','#洗脫烘','#2BR','#1BR','#套房','#屋主','#仲介','#近捷運','#附傢俱','#寵物可'];
+let tagPool = [];
+
+/* ── Storage ── */
+function load() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    entries = raw?.entries || [];
+    tagPool = raw?.tagPool || [...DEFAULT_TAGS];
+  } catch { entries = []; tagPool = [...DEFAULT_TAGS]; }
+}
+function save() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ entries, tagPool }));
+}
+
+/* ── Date ── */
+function fmtDate(iso) {
+  const d = new Date(iso);
+  return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
+}
+
+/* ── Map Icon ── */
+function makeIcon(heart) {
+  const color = heart === '♥♥♥' ? '#e03131' : heart === '♥♥' ? '#e8590c' : heart === '♥' ? '#f08c00' : '#1a73e8';
+  const label = heart ? heart.length : '';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="30" height="38" viewBox="0 0 30 38">
+    <ellipse cx="15" cy="35" rx="5" ry="2" fill="rgba(0,0,0,.2)"/>
+    <path d="M15 2C8 2 2 8 2 15c0 9 13 21 13 21s13-12 13-21C28 8 22 2 15 2Z" fill="${color}" stroke="white" stroke-width="2"/>
+    ${label ? `<text x="15" y="18" text-anchor="middle" font-size="9" fill="white" font-family="sans-serif" font-weight="bold">${label}</text>` : '<circle cx="15" cy="15" r="3" fill="white"/>'}
+  </svg>`;
+  return L.divIcon({ html: svg, iconSize:[30,38], iconAnchor:[15,38], popupAnchor:[0,-36], className:'' });
+}
+
+/* ── Markers ── */
+function addMarker(entry) {
+  if (!entry.lat || !entry.lng) return;
+  const m = L.marker([entry.lat, entry.lng], { icon: makeIcon(entry.heart) }).addTo(map);
+  const tagsHtml = (entry.tags||[]).length
+    ? `<div class="popup-tags">${entry.tags.map(t=>`<span class="popup-tag">${t}</span>`).join('')}</div>` : '';
+  const heartHtml = entry.heart ? `<div class="popup-heart">${entry.heart}</div>` : '';
+  m.bindPopup(`<div class="map-pin-popup">
+    <div style="font-weight:700;font-size:13px;margin-bottom:2px">${entry.addr}</div>
+    ${tagsHtml}${heartHtml}
+    <div style="margin-top:6px"><a href="${entry.url}" target="_blank" rel="noopener">前往 591 頁面 ↗</a></div>
+  </div>`);
+  markers[entry.id] = m;
+}
+function refreshMarker(entry) {
+  if (markers[entry.id]) { map.removeLayer(markers[entry.id]); delete markers[entry.id]; }
+  addMarker(entry);
+}
+function removeMarker(id) {
+  if (markers[id]) { map.removeLayer(markers[id]); delete markers[id]; }
+}
+
+/* ── Render tag pool (main form) ── */
+function renderTagPool() {
+  const row = document.getElementById('tags-row');
+  row.innerHTML = '<span class="tag-label">標籤</span>';
+  tagPool.forEach(tag => {
+    const btn = document.createElement('button');
+    btn.className = 'tag-btn' + (selectedTags.has(tag) ? ' active' : '');
+    btn.innerHTML = `${tag} <span class="tag-x" title="移除此標籤">✕</span>`;
+    btn.querySelector('.tag-x').addEventListener('click', e => {
+      e.stopPropagation();
+      tagPool = tagPool.filter(t => t !== tag);
+      selectedTags.delete(tag);
+      save();
+      renderTagPool();
+    });
+    btn.addEventListener('click', () => {
+      if (selectedTags.has(tag)) { selectedTags.delete(tag); btn.classList.remove('active'); }
+      else { selectedTags.add(tag); btn.classList.add('active'); }
+    });
+    row.appendChild(btn);
+  });
+}
+
+/* ── Add custom tag (main form) ── */
+document.getElementById('add-tag-btn').addEventListener('click', () => {
+  const inp = document.getElementById('custom-tag-inp');
+  let val = inp.value.trim();
+  if (!val) return;
+  // count Chinese chars (each CJK = 1), limit 6
+  const chinese = val.replace(/[^\u4e00-\u9fa5]/g,'');
+  const other = val.replace(/[\u4e00-\u9fa5]/g,'');
+  if (chinese.length > 6) { val = chinese.slice(0,6) + other; }
+  if (!val.startsWith('#')) val = '#' + val;
+  if (!tagPool.includes(val)) { tagPool.push(val); save(); }
+  selectedTags.add(val);
+  inp.value = '';
+  renderTagPool();
+});
+document.getElementById('custom-tag-inp').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('add-tag-btn').click();
+});
+
+/* ── Heart buttons (main form) ── */
+document.querySelectorAll('.heart-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const h = btn.dataset.heart;
+    if (selectedHeart === h) { selectedHeart = ''; document.querySelectorAll('.heart-btn').forEach(b=>b.classList.remove('active')); }
+    else { selectedHeart = h; document.querySelectorAll('.heart-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); }
+  });
+});
+
+/* ── Render list ── */
+function renderList() {
+  const list = document.getElementById('entries-list');
+  const divider = document.getElementById('list-divider');
+  if (!entries.length) { list.innerHTML=''; divider.style.display='none'; return; }
+  divider.style.display='';
+  list.innerHTML = entries.map(e => {
+    const tagsHtml = (e.tags||[]).map(t=>`<span class="entry-tag">${t}</span>`).join('');
+    const heartHtml = e.heart ? `<span class="entry-heart">${e.heart}</span>` : '';
+    const dateHtml = e.createdAt ? `<span class="entry-date">${fmtDate(e.createdAt)}</span>` : '';
+    const urlHtml = e.url ? `<a class="entry-link" href="${e.url}" target="_blank" rel="noopener">591↗</a>` : '';
+    return `<div class="entry-row" data-id="${e.id}">
+      <span class="entry-addr" title="${e.addr}">${e.addr}</span>
+      <div class="entry-tags">${tagsHtml}</div>
+      ${heartHtml}${dateHtml}${urlHtml}
+      <button class="edit-btn" onclick="openEdit('${e.id}')">修改</button>
+      <button class="remove-btn" onclick="removeEntry('${e.id}')" title="刪除">✖</button>
+    </div>`;
+  }).join('');
+}
+
+function removeEntry(id) {
+  entries = entries.filter(e=>e.id!==id);
+  removeMarker(id);
+  save();
+  renderList();
+}
+
+
+/* ── Geocode ── */
+
+// Nominatim 的 OSM 資料庫用「臺」而非「台」，需正規化
+function normalizeAddr(addr) {
+  return addr
+    .replace(/台北/g, '臺北')
+    .replace(/台灣/g, '臺灣')
+    .replace(/台中/g, '臺中')
+    .replace(/台南/g, '臺南')
+    .replace(/台東/g, '臺東')
+    .replace(/台西/g, '臺西');
+}
+
+async function nominatimFetch(q) {
+  const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&countrycodes=tw&accept-language=zh-TW`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if (data && data.length) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+  return null;
+}
+
+async function geocode(addr) {
+  // 依序嘗試多種變體，只要有一個成功就回傳
+  const normalized = normalizeAddr(addr);
+
+  // 1) 正規化後直接搜（臺北市大安區...）
+  try {
+    const r = await nominatimFetch(normalized);
+    if (r) { console.log('[Geocode] normalized OK', r); return r; }
+  } catch(e) { console.warn('[Geocode] normalized failed', e.message); }
+
+  // 2) 原始輸入（萬一使用者用了 OSM 認識的寫法）
+  if (normalized !== addr) {
+    try {
+      const r = await nominatimFetch(addr);
+      if (r) { console.log('[Geocode] original OK', r); return r; }
+    } catch(e) { console.warn('[Geocode] original failed', e.message); }
+  }
+
+  // 3) 加上 Taiwan 關鍵字再試
+  try {
+    const r = await nominatimFetch(normalized + ' Taiwan');
+    if (r) { console.log('[Geocode] +Taiwan OK', r); return r; }
+  } catch(e) { console.warn('[Geocode] +Taiwan failed', e.message); }
+
+  // 4) 去掉門牌號只搜路名（例：臺北市大安區復興南路一段）
+  const streetOnly = normalized.replace(/\d+號.*$/, '').replace(/\d+之\d+/, '').trim();
+  if (streetOnly !== normalized) {
+    try {
+      const r = await nominatimFetch(streetOnly);
+      if (r) { console.log('[Geocode] streetOnly OK', r); return r; }
+    } catch(e) { console.warn('[Geocode] streetOnly failed', e.message); }
+  }
+
+  console.warn('[Geocode] all attempts failed');
+  return null;
+}
+
+/* ── Add entry ── */
+document.getElementById('add-btn').addEventListener('click', async () => {
+  const addr = document.getElementById('inp-addr').value.trim();
+  const url  = document.getElementById('inp-url').value.trim();
+  const errMsg = document.getElementById('err-msg');
+  const geoSt = document.getElementById('geo-status');
+  errMsg.textContent = '';
+  if (!addr) { errMsg.textContent = '請輸入地址'; return; }
+  if (!url)  { errMsg.textContent = '請輸入 591 網址'; return; }
+
+  const btn = document.getElementById('add-btn');
+  btn.disabled = true; btn.textContent = '定位中…';
+  geoSt.textContent = '正在解析地址…';
+
+  let lat, lng;
+  try {
+    const c = await geocode(addr);
+    if (c) {
+      lat = c.lat; lng = c.lng;
+      geoSt.textContent = `✓ 定位成功：${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+      geoSt.style.color = 'var(--green)';
+    } else {
+      geoSt.textContent = '⚠ 無法解析地址，請確認地址格式（含縣市區）。物件已儲存但不顯示於地圖';
+      geoSt.style.color = 'var(--danger)';
+    }
+  } catch(e) {
+    geoSt.textContent = '⚠ 定位服務連線失敗，物件已儲存但不顯示於地圖';
+    geoSt.style.color = 'var(--danger)';
+    console.error('Geocode error:', e);
+  }
+
+  const entry = { id:Date.now().toString(), addr, url, tags:[...selectedTags], heart:selectedHeart, lat, lng, createdAt:new Date().toISOString() };
+  entries.unshift(entry);
+  save(); addMarker(entry); renderList();
+  if (lat && lng) map.setView([lat,lng], 15);
+
+  document.getElementById('inp-addr').value='';
+  document.getElementById('inp-url').value='';
+  selectedTags.clear(); selectedHeart='';
+  document.querySelectorAll('.heart-btn').forEach(b=>b.classList.remove('active'));
+  renderTagPool();
+  btn.disabled=false; btn.textContent='新增到地圖';
+});
+
+/* ── EDIT MODAL ── */
+function openEdit(id) {
+  const entry = entries.find(e=>e.id===id);
+  if (!entry) return;
+  editingId = id;
+  document.getElementById('m-addr').value = entry.addr;
+  document.getElementById('m-url').value  = entry.url;
+  modalTags = new Set(entry.tags||[]);
+  modalHeart = entry.heart||'';
+  renderModalTags();
+  renderModalHearts();
+  document.getElementById('modal').classList.add('open');
+}
+
+function renderModalTags() {
+  const row = document.getElementById('m-tags-row');
+  // merge tagPool + any tags on this entry not in pool
+  const entry = entries.find(e=>e.id===editingId);
+  const allTags = [...new Set([...tagPool, ...(entry?.tags||[])])];
+  row.innerHTML = '';
+  allTags.forEach(tag => {
+    const btn = document.createElement('button');
+    btn.className = 'tag-btn' + (modalTags.has(tag) ? ' active' : '');
+    btn.innerHTML = `${tag} <span class="tag-x" title="移除此標籤">✕</span>`;
+    btn.querySelector('.tag-x').addEventListener('click', e => {
+      e.stopPropagation();
+      tagPool = tagPool.filter(t=>t!==tag);
+      modalTags.delete(tag);
+      save();
+      renderModalTags();
+    });
+    btn.addEventListener('click', () => {
+      if (modalTags.has(tag)) { modalTags.delete(tag); btn.classList.remove('active'); }
+      else { modalTags.add(tag); btn.classList.add('active'); }
+    });
+    row.appendChild(btn);
+  });
+}
+
+function renderModalHearts() {
+  document.querySelectorAll('#m-hearts-row .heart-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.heart === modalHeart);
+    btn.onclick = () => {
+      const h = btn.dataset.heart;
+      if (modalHeart === h) { modalHeart=''; document.querySelectorAll('#m-hearts-row .heart-btn').forEach(b=>b.classList.remove('active')); }
+      else { modalHeart=h; document.querySelectorAll('#m-hearts-row .heart-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); }
+    };
+  });
+}
+
+document.getElementById('m-add-tag-btn').addEventListener('click', () => {
+  const inp = document.getElementById('m-custom-inp');
+  let val = inp.value.trim();
+  if (!val) return;
+  const chinese = val.replace(/[^\u4e00-\u9fa5]/g,'');
+  if (chinese.length > 6) val = '#' + chinese.slice(0,6);
+  if (!val.startsWith('#')) val = '#' + val;
+  if (!tagPool.includes(val)) { tagPool.push(val); save(); }
+  modalTags.add(val);
+  inp.value = '';
+  renderModalTags();
+});
+document.getElementById('m-custom-inp').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('m-add-tag-btn').click();
+});
+
+document.getElementById('modal-cancel').addEventListener('click', () => {
+  document.getElementById('modal').classList.remove('open');
+  editingId = null;
+});
+document.getElementById('modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal')) {
+    document.getElementById('modal').classList.remove('open'); editingId=null;
+  }
+});
+
+document.getElementById('modal-save').addEventListener('click', async () => {
+  const idx = entries.findIndex(e=>e.id===editingId);
+  if (idx<0) return;
+  const addr = document.getElementById('m-addr').value.trim();
+  const url  = document.getElementById('m-url').value.trim();
+  if (!addr || !url) return;
+
+  const saveBtn = document.getElementById('modal-save');
+  const cancelBtn = document.getElementById('modal-cancel');
+  const oldEntry = entries[idx];
+  let lat = oldEntry.lat, lng = oldEntry.lng;
+
+  if (addr !== oldEntry.addr) {
+    saveBtn.disabled = true;
+    saveBtn.textContent = '定位中…';
+    cancelBtn.disabled = true;
+    try {
+      const c = await geocode(addr);
+      if (c) { lat = c.lat; lng = c.lng; }
+      else { lat = undefined; lng = undefined; }
+    } catch(e) { lat = undefined; lng = undefined; }
+    saveBtn.disabled = false;
+    saveBtn.textContent = '儲存';
+    cancelBtn.disabled = false;
+  }
+
+  entries[idx] = { ...oldEntry, addr, url, tags:[...modalTags], heart:modalHeart, lat, lng };
+  save();
+  refreshMarker(entries[idx]);
+  renderList();
+  if (lat && lng) map.setView([lat, lng], 15);
+  document.getElementById('modal').classList.remove('open');
+  editingId = null;
+  renderTagPool();
+});
+
+/* ── Init ── */
+load();
+renderTagPool();
+entries.forEach(addMarker);
+renderList();
+</script>
+</body>
+</html>
