@@ -77,12 +77,14 @@ input[type="text"]::placeholder { color:#bbb; }
 /* ENTRY LIST */
 .entries-list { display:flex; flex-direction:column; gap:5px; }
 .entry-row {
-  display:flex; align-items:center; gap:8px;
+  display:flex; flex-direction:column; gap:4px;
   background:var(--bg); border:1px solid var(--border); border-radius:var(--radius);
-  padding:7px 11px; font-size:12px;
+  padding:8px 11px; font-size:12px;
 }
-.entry-addr { font-weight:600; font-size:13px; flex-shrink:0; max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.entry-tags { display:flex; gap:4px; flex-wrap:wrap; flex:1; }
+.entry-row-top { display:flex; align-items:center; gap:8px; min-width:0; }
+.entry-row-bottom { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.entry-addr { font-weight:600; font-size:13px; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.entry-tags { display:flex; gap:4px; flex-wrap:wrap; }
 .entry-tag { background:var(--accent-light); color:var(--accent); border-radius:10px; padding:1px 7px; font-size:11px; font-weight:500; }
 .entry-heart { color:var(--heart); font-size:12px; flex-shrink:0; }
 .entry-date { color:var(--text-sec); font-size:11px; flex-shrink:0; white-space:nowrap; }
@@ -328,11 +330,17 @@ function renderList() {
     const dateHtml = e.createdAt ? `<span class="entry-date">${fmtDate(e.createdAt)}</span>` : '';
     const urlHtml = e.url ? `<a class="entry-link" href="${e.url}" target="_blank" rel="noopener">591↗</a>` : '';
     return `<div class="entry-row" data-id="${e.id}">
-      <span class="entry-addr" title="${e.addr}">${e.addr}</span>
-      <div class="entry-tags">${tagsHtml}</div>
-      ${heartHtml}${dateHtml}${urlHtml}
-      <button class="edit-btn" onclick="openEdit('${e.id}')">修改</button>
-      <button class="remove-btn" onclick="removeEntry('${e.id}')" title="刪除">✖</button>
+      <div class="entry-row-top">
+        <span class="entry-addr" title="${e.addr}">${e.addr}</span>
+        ${urlHtml}
+        <button class="edit-btn" onclick="openEdit('${e.id}')">修改</button>
+        <button class="remove-btn" onclick="removeEntry('${e.id}')" title="刪除">✖</button>
+      </div>
+      <div class="entry-row-bottom">
+        ${heartHtml}
+        <div class="entry-tags">${tagsHtml}</div>
+        ${dateHtml}
+      </div>
     </div>`;
   }).join('');
 }
