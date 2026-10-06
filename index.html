@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>台北租屋地圖</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css"/>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"></script>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 :root {
@@ -23,8 +23,8 @@
   --radius:8px;
   --heart:#e03131;
 }
-body { font-family:-apple-system,BlinkMacSystemFont,'Noto Sans TC','Google Sans',sans-serif; background:var(--bg); color:var(--text); height:100dvh; display:flex; flex-direction:column; overflow:hidden; }
-#map { flex:1; min-height:0; }
+body { font-family:-apple-system,BlinkMacSystemFont,'Noto Sans TC','Google Sans',sans-serif; background:var(--bg); color:var(--text); height:100vh; height:100dvh; display:flex; flex-direction:column; overflow:hidden; }
+#map { flex:1; min-height:200px; width:100%; }
 
 /* PANEL */
 .panel { background:var(--surface); border-top:1px solid var(--border); padding:14px 18px 16px; display:flex; flex-direction:column; gap:10px; max-height:42vh; overflow-y:auto; }
@@ -195,12 +195,20 @@ input[type="text"]::placeholder { color:#bbb; }
 
 <script>
 const STORAGE_KEY = 'taipei-rental-entries-v2';
-/* ── Map (CartoDB Positron ≈ Google Maps light style) ── */
-const map = L.map('map').setView([25.046, 121.517], 13);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-  attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/">CARTO</a>',
-  subdomains: 'abcd', maxZoom: 19
-}).addTo(map);
+/* ── Map (OpenStreetMap) ── */
+let map;
+try {
+  map = L.map('map', { zoomControl: true, tap: false }).setView([25.046, 121.517], 13);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom: 19
+  }).addTo(map);
+  // 確保地圖在 DOM 完全渲染後重新計算尺寸
+  setTimeout(() => { map.invalidateSize(); }, 300);
+} catch(e) {
+  document.getElementById('map').innerHTML = '<div style="padding:20px;color:red;">地圖載入失敗：' + e.message + '</div>';
+  console.error('Map init error:', e);
+}
 
 /* ── State ── */
 let entries = [];
